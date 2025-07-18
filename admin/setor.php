@@ -1,142 +1,227 @@
 <?php
-// user/setor.php
 session_start();
-include '../koneksi.php';
+include '../koneksi.php'; // AKTIFKAN KEMBALI KONEKSI DATABASE
 
-// Cek apakah user sudah login
-if (!isset($_SESSION['user']) || !isset($_SESSION['user']['id'])) {
-    header("Location: ../login.php");
+// Cek login admin - AKTIFKAN KEMBALI CEK SESSION ADMIN
+if (!isset($_SESSION['admin'])) {
+    header("Location: ../login_admin.php");
     exit;
 }
 
-$user_id = $_SESSION['user']['id'];
+// Ambil data admin dari DATABASE (bukan dummy lagi)
+$admin_id = $_SESSION['admin']['id']; // Pastikan $_SESSION['admin']['id'] diset saat login
+$query_admin = "SELECT * FROM admin WHERE id = '$admin_id'";
+$result_admin = mysqli_query($conn, $query_admin);
 
-// --- Logika untuk memproses "Setor" ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_setor') {
-    $penyetoran_id_to_confirm = $_POST['penyetoran_id'];
-
-    // Update status penyetoran menjadi 'completed' atau 'submitted'
-    // Status 'approved' berarti admin sudah setuju, 'completed' berarti user sudah 'menyetorkan' fisik
-    $update_query = "UPDATE penyetoran SET status = 'completed' WHERE id = '$penyetoran_id_to_confirm' AND user_id = '$user_id' AND status = 'approved'";
-    
-    if (mysqli_query($conn, $update_query)) {
-        $_SESSION['success_message'] = "Penyetoran berhasil dikonfirmasi dan poin Anda telah ditambahkan!";
-    } else {
-        $_SESSION['error_message'] = "Gagal mengkonfirmasi penyetoran: " . mysqli_error($conn);
-    }
-
-    // Redirect untuk menghindari POST ganda
-    header("Location: setor.php");
-    exit;
-}
-
-// --- Query untuk mendapatkan penyetoran user yang sudah 'approved' (menunggu dikonfirmasi user) ---
-$queryApprovedSetoran = "
-    SELECT
-        p.id AS penyetoran_id,
-        js.nama AS nama_jenis_sampah,
-        dp.jumlah AS jumlah_sampah
-    FROM
-        penyetoran p
-    JOIN
-        detail_penyetoran dp ON p.id = dp.penyetoran_id
-    JOIN
-        jenis_sampah js ON dp.jenis_id = js.id
-    WHERE
-        p.user_id = '$user_id' AND p.status = 'approved'
-    ORDER BY
-        p.tanggal DESC, p.id DESC;
-";
-
-$resultApprovedSetoran = mysqli_query($conn, $queryApprovedSetoran);
-
-// Mengelompokkan detail sampah per penyetoran_id
-$approved_transactions_for_user = [];
-if ($resultApprovedSetoran) {
-    while ($row = mysqli_fetch_assoc($resultApprovedSetoran)) {
-        $penyetoran_id = $row['penyetoran_id'];
-        if (!isset($approved_transactions_for_user[$penyetoran_id])) {
-            $approved_transactions_for_user[$penyetoran_id] = [
-                'id' => $row['penyetoran_id'],
-                'detail_sampah' => []
-            ];
-        }
-        $approved_transactions_for_user[$penyetoran_id]['detail_sampah'][] = [
-            'nama_jenis_sampah' => $row['nama_jenis_sampah'],
-            'jumlah_sampah' => $row['jumlah_sampah']
-        ];
-    }
+$admin = []; // Inisialisasi variabel admin
+if ($result_admin && mysqli_num_rows($result_admin) > 0) {
+    $admin = mysqli_fetch_assoc($result_admin);
 } else {
-    $_SESSION['error_message'] = "Error mengambil data penyetoran: " . mysqli_error($conn);
+    // Fallback jika data admin tidak ditemukan, bisa ke logout atau set dummy
+    // Untuk pengembangan, kita bisa set dummy sementara atau redirect ke logout
+    // header("Location: ../logout.php"); // Atau redirect ke logout
+    // exit;
+    $admin = ['id' => 0, 'nama' => 'Admin Tidak Dikenal']; // Fallback dummy
 }
 
-?>
 
+// --- Logika Dummy untuk Riwayat Setoran (TETAP DUMMY SESUAI PERMINTAAN) ---
+// Query data setoran ke pihak ketiga (gunakan data dummy)
+$dummy_setoran_data = [
+    [
+        'tanggal' => '2025-07-15',
+        'penerima' => 'PT. Daur Ulang Mandiri',
+        'berat' => 150.75,
+        'catatan' => 'Sampah plastik botol dan kaleng aluminium',
+        'id' => 1
+    ],
+    [
+        'tanggal' => '2025-07-10',
+        'penerima' => 'CV. Jaya Lestari',
+        'berat' => 210.50,
+        'catatan' => 'Kardus dan kertas bekas',
+        'id' => 2
+    ],
+    [
+        'tanggal' => '2025-07-01',
+        'penerima' => 'Yayasan Peduli Lingkungan',
+        'berat' => 80.20,
+        'catatan' => 'Khusus botol kaca hijau',
+        'id' => 3
+    ],
+    [
+        'tanggal' => '2025-06-25',
+        'penerima' => 'PT. Daur Ulang Mandiri',
+        'berat' => 120.00,
+        'catatan' => 'Campuran plastik dan besi',
+        'id' => 4
+    ],
+];
+
+// Urutkan data dummy berdasarkan tanggal secara DESC (baru ke lama)
+usort($dummy_setoran_data, function($a, $b) {
+    return strtotime($b['tanggal']) - strtotime($a['tanggal']);
+});
+
+$result_setoran = $dummy_setoran_data; // Variabel ini sekarang berisi array dummy
+
+// --- Proses Form Submit (SIMULASI - TIDAK ADA INSERT KE DATABASE NYATA) ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit'])) {
+    $tanggal_simulasi = $_POST['tanggal'] ?? 'N/A';
+    $penerima_simulasi = $_POST['penerima'] ?? 'N/A';
+    $berat_simulasi = $_POST['berat'] ?? 'N/A';
+
+    // Ini hanya simulasi, tidak ada INSERT ke database
+    $_SESSION['success_message'] = "Data setoran (simulasi) berhasil disimpan untuk " . htmlspecialchars($penerima_simulasi) . " (" . htmlspecialchars($berat_simulasi) . " kg)! (Tidak tersimpan permanen)";
+    
+    // Tidak perlu header redirect, biarkan halaman me-refresh dan menampilkan pesan
+}
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Siap Setor - Skotrash</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setor ke Pihak Ketiga - Skotrash</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        .sidebar-link.active {
+            background-color: #f0fdf4;
+            color: #047857;
+            border-right: 4px solid #059669;
+        }
+        .sidebar-link:hover:not(.active) {
+            background-color: #f0fdf4;
+        }
+    </style>
 </head>
-<body class="bg-green-50 min-h-screen">
+<body class="bg-gray-50 flex h-screen">
+    <div class="w-64 bg-white shadow-lg flex flex-col">
+        <div class="p-4 border-b flex items-center space-x-3">
+            <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                ♻️
+            </div>
+            <h1 class="text-lg font-bold text-green-700">Skotrash Admin</h1>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-4">
+            <a href="index.php" class="sidebar-link block py-3 px-6 flex items-center">
+                <i class="fas fa-tachometer-alt mr-3"></i> Dashboard
+            </a>
+            <a href="user.php" class="sidebar-link block py-3 px-6 flex items-center">
+                <i class="fas fa-users mr-3"></i> Approval User
+            </a>
+            <a href="setor.php" class="sidebar-link active block py-3 px-6 flex items-center">
+                <i class="fas fa-truck mr-3"></i> Setor ke Pihak Ketiga
+            </a>
+        </nav>
+        <div class="p-4 border-t">
+            <a href="../logout.php" class="flex items-center text-gray-600 hover:text-red-600">
+                <i class="fas fa-sign-out-alt mr-2"></i> Logout
+            </a>
+        </div>
+    </div>
 
-    <nav class="bg-white shadow px-6 py-4 flex justify-between items-center">
-        <h1 class="text-xl font-bold text-green-700">Skotrash</h1>
-        <ul class="flex space-x-6 text-sm font-medium text-gray-700">
-            <li><a href="index.php" class="hover:text-green-600">Home</a></li>
-            <li><a href="user.php" class="hover:text-green-600">User</a></li>
-            <li><a href="setor.php" class="hover:text-green-600">Setor</a></li>
-        </ul>
-    </nav>
-
-    <div class="container mx-auto p-6">
-        <h2 class="text-3xl font-bold text-gray-800 mb-6">Penyetoran Siap Diserahkan</h2>
-
-        <?php
-        // Tampilkan pesan sukses/error
-        if (isset($_SESSION['success_message'])) {
-            echo '<div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">' . htmlspecialchars($_SESSION['success_message']) . '</div>';
-            unset($_SESSION['success_message']);
-        }
-        if (isset($_SESSION['error_message'])) {
-            echo '<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">' . htmlspecialchars($_SESSION['error_message']) . '</div>';
-            unset($_SESSION['error_message']);
-        }
-        ?>
-
-        <?php if (!empty($approved_transactions_for_user)): ?>
-            <div class="space-y-6">
-                <p class="text-gray-700 mb-4">Berikut adalah daftar penyetoran Anda yang telah disetujui oleh Admin. Silakan serahkan sampah Anda sesuai dengan daftar di bawah ini.</p>
-                <?php foreach ($approved_transactions_for_user as $transaction): ?>
-                    <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
-                        <h3 class="text-lg font-semibold text-gray-800 mb-3">Detail Penyetoran #<?= htmlspecialchars($transaction['id']) ?></h3>
-                        
-                        <ul class="list-disc list-inside space-y-1 text-gray-700 mb-4">
-                            <?php foreach ($transaction['detail_sampah'] as $detail): ?>
-                                <li>
-                                    <span class="font-semibold"><?= htmlspecialchars($detail['nama_jenis_sampah']) ?></span>: 
-                                    <?= number_format($detail['jumlah_sampah'], 2, ',', '.') ?> Kg/Satuan
-                                </li>
-                            <?php endforeach; ?>
-                        </ul>
-
-                        <form method="POST" action="setor.php" class="text-right">
-                            <input type="hidden" name="penyetoran_id" value="<?= $transaction['id'] ?>">
-                            <input type="hidden" name="action" value="confirm_setor">
-                            <button type="submit" class="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition duration-300 ease-in-out">
-                                <i class="fas fa-check-circle mr-2"></i> Konfirmasi Penyerahan
-                            </button>
-                        </form>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white shadow-sm py-4 px-6 flex justify-between items-center">
+            <h2 class="text-xl font-semibold text-gray-800">Setor ke Pihak Ketiga</h2>
+            <div class="flex items-center space-x-4">
+                <div class="relative">
+                    <button class="p-2 rounded-full hover:bg-gray-100">
+                        <i class="fas fa-bell text-gray-600"></i>
+                        <span class="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white">
+                        <?= strtoupper(substr($admin['nama'], 0, 1)) ?>
                     </div>
-                <?php endforeach; ?>
+                    <span class="text-sm font-medium"><?= $admin['nama'] ?></span>
+                </div>
             </div>
-        <?php else: ?>
-            <div class="bg-white rounded-lg shadow p-6 text-center text-gray-600">
-                Tidak ada penyetoran yang menunggu untuk diserahkan.
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-6 bg-gray-50">
+            <?php if (isset($_SESSION['success_message'])): ?>
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-6">
+                    <?= $_SESSION['success_message'] ?>
+                    <?php unset($_SESSION['success_message']); ?>
+                </div>
+            <?php endif; ?>
+            
+            <?php if (isset($_SESSION['error_message'])): ?>
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6">
+                    <?= $_SESSION['error_message'] ?>
+                    <?php unset($_SESSION['error_message']); ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-xl font-semibold mb-6">Setor Sampah ke Pihak Ketiga</h3>
+                
+                <form method="POST" action="setor.php" class="mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal Setor</label>
+                            <input type="date" name="tanggal" class="w-full p-2 border rounded-lg" value="<?= date('Y-m-d') ?>">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Penerima</label>
+                            <input type="text" name="penerima" class="w-full p-2 border rounded-lg" placeholder="Nama Penerima" required>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Total Berat (kg)</label>
+                            <input type="number" name="berat" step="0.01" class="w-full p-2 border rounded-lg" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Catatan</label>
+                        <textarea name="catatan" class="w-full p-2 border rounded-lg" rows="3"></textarea>
+                    </div>
+                    <button type="submit" name="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                        <i class="fas fa-save mr-2"></i> Simpan Setoran
+                    </button>
+                </form>
+
+                <h4 class="font-medium mb-3">Riwayat Setoran</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-white">
+                        <thead>
+                            <tr class="bg-gray-100 text-left text-gray-700">
+                                <th class="py-2 px-4">Tanggal</th>
+                                <th class="py-2 px-4">Penerima</th>
+                                <th class="py-2 px-4">Berat (kg)</th>
+                                <th class="py-2 px-4">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php 
+                            // Loop menggunakan data dummy
+                            foreach ($result_setoran as $row): ?>
+                                <tr class="border-b">
+                                    <td class="py-3 px-4"><?= date('d/m/Y', strtotime($row['tanggal'])) ?></td>
+                                    <td class="py-3 px-4"><?= htmlspecialchars($row['penerima']) ?></td>
+                                    <td class="py-3 px-4"><?= number_format($row['berat'], 2) ?></td>
+                                    <td class="py-3 px-4">
+                                        <button class="text-blue-600 hover:text-blue-800 mr-3" title="Cetak">
+                                            <i class="fas fa-print"></i>
+                                        </button>
+                                        <button class="text-red-600 hover:text-red-800" title="Hapus">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            <?php if (empty($result_setoran)): ?>
+                                <tr>
+                                    <td colspan="4" class="py-3 px-4 text-center text-gray-500">Belum ada riwayat setoran (data dummy kosong).</td>
+                                </tr>
+                            <?php endif; ?>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        <?php endif; ?>
+        </main>
     </div>
 </body>
 </html>
