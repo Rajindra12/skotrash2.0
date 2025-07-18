@@ -25,14 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['jenis_id'])) {
         $error = "Jumlah sampah tidak boleh 0 atau kurang dari 0. Mohon masukkan jumlah yang valid.";
     } else {
         $jenis = mysqli_fetch_assoc(mysqli_query($conn, "SELECT * FROM jenis_sampah WHERE id = $jenis_id"));
-        
+
         // Pastikan jenis sampah ditemukan
         if ($jenis) {
             $poin_per_satuan = $jenis['poin_per_satuan'];
             $total_poin = $poin_per_satuan * $quantity;
 
             // Memulai transaksi
-            mysqli_begin_trans($conn);
+            // GANTI: mysqli_begin_trans($conn);
+            mysqli_autocommit($conn, FALSE); // Mengatur autocommit menjadi FALSE
 
             try {
                 // Insert ke tabel penyetoran
@@ -51,17 +52,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['jenis_id'])) {
                     throw new Exception("Error saat memasukkan data detail penyetoran: " . $stmt_detail->error);
                 }
                 $stmt_detail->close();
-                
+
                 // Poin di tabel users akan diupdate saat status penyetoran menjadi 'approved' oleh admin,
                 // jadi baris ini dihapus agar total_poin user hanya bertambah jika sudah disetujui.
-                // mysqli_query($conn, "UPDATE users SET total_poin = total_poin + $total_poin WHERE id = $user_id"); 
-                
-                mysqli_commit($conn);
+                // mysqli_query($conn, "UPDATE users SET total_poin = total_poin + $total_poin WHERE id = $user_id");
+
+                mysqli_commit($conn); // Commit transaksi
                 $success = "Setor berhasil untuk jenis '{$jenis['nama']}' sebanyak " . number_format($quantity, 2, ',', '.') . " kg. Menunggu persetujuan admin. (Poin Estimasi: " . number_format($total_poin) . ")";
 
             } catch (Exception $e) {
-                mysqli_rollback($conn);
+                mysqli_rollback($conn); // Rollback transaksi jika ada kesalahan
                 $error = "Terjadi kesalahan: " . $e->getMessage();
+            } finally {
+                mysqli_autocommit($conn, TRUE); // Mengatur autocommit kembali ke TRUE setelah transaksi selesai
             }
         } else {
             $error = "Jenis sampah tidak ditemukan.";
@@ -154,22 +157,22 @@ else $greeting = "Selamat malam";
     <div class="absolute inset-0 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600"></div>
     <div class="absolute inset-0 bg-black opacity-10"></div>
 
-    <div class="relative px-4 sm:px-6 pt-16 pb-12"> 
+    <div class="relative px-4 sm:px-6 pt-16 pb-12">
         <div class="flex items-center justify-between mb-8">
-            <div class="flex items-center space-x-3 sm:space-x-4 flex-grow min-w-0"> 
+            <div class="flex items-center space-x-3 sm:space-x-4 flex-grow min-w-0">
                 <a href="index.php" class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center flex-shrink-0">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
                 </a>
-                <div class="min-w-0"> 
+                <div class="min-w-0">
                     <p class="text-white/80 text-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] sm:max-w-xs"><?= $greeting ?>,</p>
                     <p class="text-white font-bold text-xl whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] sm:max-w-xs"><?= htmlspecialchars($nama) ?></p>
                     <p class="text-white/70 text-xs whitespace-nowrap overflow-hidden text-ellipsis max-w-[150px] sm:max-w-xs"><?= htmlspecialchars($kelas) ?> • SMK Telkom</p>
                 </div>
             </div>
 
-            <div class="flex items-center space-x-3 sm:space-x-4 flex-shrink-0"> 
+            <div class="flex items-center space-x-3 sm:space-x-4 flex-shrink-0">
                 <div class="relative flex-shrink-0">
                     <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                         <span class="text-white text-lg">🔔</span>
@@ -364,7 +367,7 @@ function updateSetorButton(id) {
     const submitButton = input.closest('form').querySelector('button[type="submit"]');
 
     let val = parseFloat(input.value) || 0;
-    
+
     // Pastikan nilai tidak negatif
     if (val < 0) {
         val = 0;
@@ -396,9 +399,9 @@ function updateSetorButton(id) {
 function changeQuantity(id, step) {
     const input = document.getElementById('qty-' + id);
     let val = parseFloat(input.value) || 0;
-    
+
     val += step;
-    
+
     // Pastikan nilai tidak negatif
     if (val < 0) {
         val = 0;
@@ -407,7 +410,7 @@ function changeQuantity(id, step) {
     // Pembulatan ke 2 angka desimal untuk input
     val = Math.round(val * 100) / 100;
     input.value = val;
-    
+
     updateSetorButton(id); // Panggil updateSetorButton setelah mengubah quantity
 }
 
@@ -417,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function() {
     quantityInputs.forEach(input => {
         // Panggil updateSetorButton saat halaman dimuat untuk menginisialisasi status tombol
         const id = input.id.replace('qty-', '');
-        updateSetorButton(id); 
+        updateSetorButton(id);
 
         input.addEventListener('input', function() {
             // Validasi input langsung agar tidak bisa diisi negatif
@@ -461,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
             //     button.disabled = false;
             //     button.classList.remove('opacity-50', 'cursor-not-allowed');
             //     button.classList.add('hover:from-emerald-600', 'hover:to-teal-600', 'hover:scale-[1.02]');
-            // }, 2000); 
+            // }, 2000);
         });
     });
 });
